@@ -7,6 +7,13 @@ configuration:
   aliases:
     name: Alias
     description: A list aliases of domains configured on the `domains` option.
+  stratoUserName:
+    name: Strato username
+    description: One random domain name belonging to your Strato account.
+  stratoPassword:
+    name: Strato DynDNS password
+    description: >-
+      The password for your Strato DynDNS (can be set in your Strato account settings).
   lets_encrypt:
     name: Let's Encrypt
     description: Configure Let's Encrypt options
