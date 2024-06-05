@@ -1,5 +1,5 @@
 ---
-version: "0.0.9"
+version: "1.0.0"
 slug: stratodns
 name: Strato DynDNS
 description: >-
@@ -37,7 +37,7 @@ schema:
     - alias: str
       domain: str
   stratoUserName: str
-  stratoPassword: str
+  stratoPassword: password
   lets_encrypt:
     accept_terms: bool
     algo: list(rsa|prime256v1|secp384r1)
