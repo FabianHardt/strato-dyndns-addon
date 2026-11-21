@@ -1,5 +1,5 @@
 ---
-version: "1.0.0"
+version: "1.1.0"
 slug: stratodns
 name: Strato DynDNS
 description: >-
@@ -45,4 +45,5 @@ schema:
     keyfile: str
   seconds: int
   ipv4: str?
+  ipv6_interface_id: match(^::[0-9a-fA-F:]+$)?
 startup: services

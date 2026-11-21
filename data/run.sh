@@ -8,6 +8,7 @@ LE_UPDATE="0"
 
 # StratoDynDNS
 if bashio::config.has_value "ipv4"; then IPV4=$(bashio::config 'ipv4'); else IPV4=""; fi
+if bashio::config.has_value "ipv6_interface_id"; then IPV6_IID=$(bashio::config 'ipv6_interface_id'); else IPV6_IID=""; fi
 DOMAINS=$(bashio::config 'domains | join(",")')
 WAIT_TIME=$(bashio::config 'seconds')
 ALGO=$(bashio::config 'lets_encrypt.algo')
@@ -18,6 +19,37 @@ STRATO_PASSWORD=$(bashio::config 'stratoPassword')
 # Start nginx server
 cp /share/nginx/nginx.conf /etc/nginx/http.d/default.conf
 nginx
+
+function expand_ipv6() {
+    local ip="$1" left right out i
+    local -a groups=() l=() r=()
+
+    if [[ "${ip}" == *::* ]]; then
+        left="${ip%%::*}"
+        right="${ip#*::}"
+        [[ -n "${left}" ]] && IFS=: read -ra l <<< "${left}"
+        [[ -n "${right}" ]] && IFS=: read -ra r <<< "${right}"
+        groups=("${l[@]}")
+        for ((i = ${#l[@]} + ${#r[@]}; i < 8; i++)); do groups+=(0); done
+        groups+=("${r[@]}")
+    else
+        IFS=: read -ra groups <<< "${ip}"
+    fi
+
+    [[ ${#groups[@]} -eq 8 ]] || return 1
+    for i in "${groups[@]}"; do [[ "${i}" =~ ^[0-9a-fA-F]{1,4}$ ]] || return 1; done
+
+    out=$(printf '%x:' "${groups[@]/#/0x}")
+    echo "${out%:}"
+}
+
+# Current /64 prefix (detected via the host's public IPv6) combined with the configured interface ID
+function build_ipv6() {
+    local public iid
+    public=$(expand_ipv6 "$(curl -6 -s -m 10 https://api6.ipify.org)") || return 1
+    iid=$(expand_ipv6 "${IPV6_IID}") || return 1
+    echo "$(cut -d: -f1-4 <<< "${public}"):$(cut -d: -f5-8 <<< "${iid}")"
+}
 
 # Function that performs a renew
 function le_renew() {
@@ -75,9 +107,21 @@ echo 'WELLKNOWN="/share/www"' > "${WORK_DIR}/config"
 while true; do
 
     [[ ${IPV4} != *:/* ]] && ipv4=${IPV4} || ipv4=$(curl -s -m 10 "${IPV4}")
+    myip=${ipv4}
 
-    if [[ -z ${ipv4} || ${ipv4} == *.* ]]; then
-        if answer="$(curl -s -u "${STRATO_USER}:${STRATO_PASSWORD}" "https://dyndns.strato.com/nic/update?hostname=${DOMAINS}&myip=${ipv4}")" && [ "${answer}" != 'KO' ]; then
+    if [[ -n ${IPV6_IID} && ${ipv4} != none ]]; then
+        # With an explicit IPv6 in myip, Strato no longer auto-detects IPv4, so it must be sent too
+        [[ -z ${ipv4} ]] && ipv4=$(curl -4 -s -m 10 https://api.ipify.org)
+        if ipv6=$(build_ipv6) && [[ ${ipv4} == *.* ]]; then
+            myip="${ipv4},${ipv6}"
+        else
+            bashio::log.warning "IPv6 detection failed, updating IPv4 only"
+            myip=${ipv4}
+        fi
+    fi
+
+    if [[ -z ${myip} || ${myip} == *.* ]]; then
+        if answer="$(curl -s -u "${STRATO_USER}:${STRATO_PASSWORD}" "https://dyndns.strato.com/nic/update?hostname=${DOMAINS}&myip=${myip}")" && [ "${answer}" != 'KO' ]; then
             if [[ "${answer}" == *NOCHANGE* ]]; then
    		bashio::log.debug "${answer}"
 	    else
