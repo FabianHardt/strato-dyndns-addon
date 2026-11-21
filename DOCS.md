@@ -91,6 +91,24 @@ If you specify a URL here, contents of the resource it points to will be
 fetched and used as the address. This enables getting the address using
 a service like https://api.ipify.org/ or https://ipv4.text.wtfismyip.com
 
+### Option: `ipv6_interface_id` (optional)
+
+Updates the AAAA record of your domains in addition to the A record.
+
+Specify the interface ID (the last 64 bits, starting with `::`) of the device
+your domain should point to, e.g. `::2ecf:67ff:fe9e:95c1`. On a FRITZ!Box it is
+shown under **Home Network → Network → (device) → IPv6 Interface ID**. This is
+usually the device behind your port forwarding (e.g. a reverse proxy), not
+necessarily Home Assistant itself.
+
+The add-on detects the current IPv6 prefix of your connection via
+https://api6.ipify.org and combines it with this interface ID, so the AAAA
+record follows prefix changes of your provider. If the detection fails, only
+the IPv4 address is updated and the AAAA record is left unchanged.
+
+Without this option, Strato keeps whatever AAAA record exists, which may
+point to an outdated prefix.
+
 ### Option `stratoUserName`
 
 This is a random domain-name of your Strato account. It can be the same domain name, that you use in `domains` section, but it hasn't to be.
